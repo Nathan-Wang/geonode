@@ -11,6 +11,8 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import call_command
 
+from owslib.wms import WebMapService
+
 from geoserver.catalog import FailedRequestError
 
 from geonode.security.models import *
@@ -23,7 +25,7 @@ from geonode.layers.utils import (
     save
 )
 
-from .utils import check_layer, get_web_page
+from .utils import check_layer, get_web_page, check_blank_image
 
 from geonode.maps.utils import *
 
@@ -249,6 +251,21 @@ class GeoNodeMapTest(TestCase):
         for layer in expected_layers:
             layer_name = layers[layer]
             Layer.objects.get(name=layer_name).delete()
+
+    def test_wms_layers(self):
+        """
+        Get a list of all the WMS layers available on the server
+        and loop through each one to check if it is blank
+        """
+
+        server_url = settings.GEOSERVER_BASE_URL + 'ows?'
+        wms = WebMapService(server_url, version='1.1.1', username='root', password='geoserver')
+        layer_names = list(wms.contents)
+	print layer_names
+
+        for l in layer_names:
+            print "Checking '%s'..." % l
+            check_blank_image(url, l)
 
     def test_extension_not_implemented(self):
         """Verify a GeoNodeException is returned for not compatible extensions
