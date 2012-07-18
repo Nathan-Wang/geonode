@@ -253,15 +253,28 @@ class GeoNodeMapTest(TestCase):
         Get a list of all the WMS layers available on the server
         and loop through each one to check if it is blank
         """
+        #uploaded = upload(gisdata.DATA_DIR)
 
-        server_url = settings.GEOSERVER_BASE_URL + 'ows?'
-        wms = WebMapService(server_url, version='1.1.1', username='root', password='geoserver')
+        gs_username, gs_password = settings.GEOSERVER_CREDENTIALS
+        #server_url = settings.GEOSERVER_BASE_URL + 'wms'
+        server_url = 'http://demo.geonode.org/geoserver/wms'
+        wms = WebMapService(server_url)
         layer_names = list(wms.contents)
-	print layer_names
+        layer_count = len(layer_names)
 
+        good_layers = 0
+        bad_layers = 0
+        bad_layer_list = []
         for l in layer_names:
             print "Checking '%s'..." % l
-            check_blank_image(url, l)
+            if check_blank_image(server_url, l) == False:
+                good_layers += 1
+            else:
+                bad_layers += 1
+                bad_layer_list.append(l)
+        if len(bad_layer_list > 0):
+            print bad_layer_list
+        self.assertEquals(good_layers, layer_count)
 
     def test_extension_not_implemented(self):
         """Verify a GeoNodeException is returned for not compatible extensions

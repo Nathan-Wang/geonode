@@ -154,6 +154,8 @@ def check_blank_image(url, layer_name):
             print "A blank image was returned!"
         else:
             print "The image contains data."
+        return False
     else:
         # if there are errors then these can be printed out here
         print resp.content
+        return True
