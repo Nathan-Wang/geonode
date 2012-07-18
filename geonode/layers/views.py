@@ -312,6 +312,8 @@ def layer_batch_download(request):
     if request.method == 'POST':
         layers = request.POST.getlist("layer")
         layers = Layer.objects.filter(typename__in=list(layers))
+        # TODO: Should this not check that all of the layers specified 
+        # are in fact valid layers?
 
         def layer_son(layer):
             return {
@@ -331,9 +333,9 @@ def layer_batch_download(request):
             "map": { "readme": readme },
             "layers" : [layer_son(lyr) for lyr in layers]
         }
-
         url = "%srest/process/batchDownload/launch/" % settings.GEOSERVER_BASE_URL
         resp, content = http_client.request(url,'POST',body=json.dumps(fake_map))
+        # Looks like it just returns an empty response and HTTP 417 if something is wrong
         return HttpResponse(content, status=resp.status)
 
     

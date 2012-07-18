@@ -6,6 +6,7 @@ import json
 from unittest import TestCase
 import urllib
 import urllib2
+import time
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -573,3 +574,37 @@ class GeoNodeMapTest(TestCase):
         client.login()
         resp = client.get('/' + uploaded.get_absolute_url())
         self.assertEquals(resp.code, 200)
+
+    def test_batch_download(self):
+        """Test the batch download functionality
+        """
+        # Upload Some Data to work with
+        uploaded = upload(gisdata.GOOD_DATA)
+        upload_list = []
+        for item in uploaded:
+            upload_list.append('geonode:' + item['name'])
+         
+        from django.test.client import Client
+        c = Client()
+        c.login(username='admin', password='admin')
+
+        response = c.post('/data/download', {'layer': upload_list})
+        if response.status_code == 200:
+            # go for it
+            response_dict = json.loads(response.content)
+            status = response_dict['status']
+            id = response_dict['id']
+            progress = response_dict['progress']
+            while(progress < 100):
+                reponse = c.get('/data/download?id=%s' % id)
+                print response
+                response_dict = json.loads(response.content)
+                status = response_dict['status']
+                id = response_dict['id']
+                progress = response_dict['progress']
+                time.sleep(1)
+            print "done" 
+        else:
+            # some error
+            pass
+
