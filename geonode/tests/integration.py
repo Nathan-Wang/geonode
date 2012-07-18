@@ -23,7 +23,7 @@ from geonode.layers.utils import (
     file_upload,
     save
 )
-
+from geonode.utils import http_client
 from .utils import check_layer, get_web_page
 
 from geonode.maps.utils import *
@@ -596,15 +596,20 @@ class GeoNodeMapTest(TestCase):
             id = response_dict['id']
             progress = response_dict['progress']
             while(progress < 100):
-                reponse = c.get('/data/download?id=%s' % id)
-                print response
-                response_dict = json.loads(response.content)
-                status = response_dict['status']
-                id = response_dict['id']
-                progress = response_dict['progress']
+                url = '%sdata/download?id=%s' % (settings.SITEURL, id)
+                response, content = http_client.request(url,'GET')
+                content_dict = json.loads(content) 
+                status = content_dict['process']['status']
+                id = content_dict['process']['id']
+                progress = content_dict['process']['progress']
                 time.sleep(1)
-            print "done" 
+            download_url = "%srest/process/batchDownload/download/%s" % (settings.GEOSERVER_BASE_URL, id)
+            print download_url
+            # Download the file
+            # Unzip it
+            # Check that the readme is included
+            # Check that all the files are included
+            # Check through each file to see that they are valid
         else:
-            # some error
+            # TODO deal with some error
             pass
-
