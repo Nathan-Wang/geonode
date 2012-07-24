@@ -6,16 +6,19 @@ import json
 from unittest import TestCase
 import urllib
 import urllib2
+import time
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import call_command
+from django.contrib.auth.models import User
 
 from geoserver.catalog import FailedRequestError
 
 from geonode.security.models import *
 from geonode.layers.models import Layer
 from geonode.layers.views import layer_set_permissions
+from geonode.maps.models import Map
 from geonode import GeoNodeException
 from geonode.layers.utils import (
     upload,
@@ -25,7 +28,7 @@ from geonode.layers.utils import (
 
 from .utils import check_layer, get_web_page
 
-from geonode.maps.utils import *
+from geonode.utils import http_client 
 from geonode.catalogue import get_catalogue
 
 from geonode.gs_helpers import cascading_delete, fixup_style
@@ -130,8 +133,6 @@ class NormalUserTest(TestCase):
         """ Try uploading a layer and verify that the user can administrate
         his own layer despite not being a site administrator.
         """
-
-        from django.contrib.auth.models import User
 
         client = _Client(
             settings.SITEURL,
@@ -573,3 +574,47 @@ class GeoNodeMapTest(TestCase):
         client.login()
         resp = client.get('/' + uploaded.get_absolute_url())
         self.assertEquals(resp.code, 200)
+
+    def test_map_batch_download(self):
+        """Test the map batch download functionality
+        """
+
+        # Upload Some Data to work with
+        uploaded = upload(gisdata.GOOD_DATA)
+        upload_list = []
+        for item in uploaded:
+            upload_list.append('geonode:' + item['name'])
+
+        from django.test.client import Client
+        c = Client()
+        c.login(username='admin', password='admin')
+  
+        # Test successful new map creation
+        m = Map()
+        admin_user = User.objects.get(username='admin')
+        m.create_from_layer_list(admin_user, upload_list, "title", "abstract")
+  
+        url = '%smaps/%d/download' % (settings.SITEURL, m.id)
+        response = c.post(url)
+        if response.status_code == 200:
+            map_status = c.session.get('map_status')
+            response_dict = map_status
+            # This code is copied from the layer batch download test
+            # should be put into an function for reuse
+            status = response_dict['status']
+            id = response_dict['id']
+            progress = response_dict['progress']
+            while(progress < 100):
+                url = '%sdata/download?id=%s' % (settings.SITEURL, id)
+                response, content = http_client.request(url,'GET')
+                content_dict = json.loads(content)
+                status = content_dict['process']['status']
+                id = content_dict['process']['id']
+                progress = int(content_dict['process']['progress'])
+                print progress
+                time.sleep(1)
+            download_url = "%srest/process/batchDownload/download/%s" % (settings.GEOSERVER_BASE_URL, id)
+            print download_url
+        else:
+            # some error
+           pass
