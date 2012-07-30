@@ -659,116 +659,15 @@ class GeoNodeMapTest(TestCase):
             f.close()
         z.close()
         os.unlink(name)
-
-    def test_layer_remove(self):
-        """Test layer remove functionality
-        """
-        # Upload Some Data to work with
-               
-        uploaded = upload(gisdata.GOOD_DATA)
-        upload_list = []
-        for item in uploaded:
-            upload_list.append('geonode:' + item['name'])
-        
-        #test a valid user with layer removal permission         
-        from django.test.client import Client
-        c = Client()
-        c.login(username='admin', password='admin')
          
-        url = '%sdata/%s/remove' % (settings.SITEURL, upload_list.pop())
-        response = c.get(url)
-        self.assertEquals(response.status_code, 200)
-
-        ##################################work on it#######################################
-        #test the post method 
-        response = c.post(url)
-        self.assertEquals(response.status_code, 200)
-        ##################################work on it#######################################
-
-        #test a method other than POST and GET 
-        response = c.head(url)
-        self.assertEquals(response.status_code, 403)
+    def test_wfs_download(self):
         
-        #test an invalid user without layer removal permission
-        c.logout()   
-        c.login(username='norman', password='norman')
-          
-        url = '%sdata/%s/remove' % (settings.SITEURL, upload_list.pop())
-        response = c.post(url)
-        self.assertEquals(response.status_code, 403)
-
-    def test_layer_replace(self):
-        """Test layer replace functionality
-        """
-        # Upload Some Data to work with
-               
-        uploaded_vector = upload(gisdata.VECTOR_DATA)
-        upload_list_vector = []
-        for item in uploaded_vector:
-            upload_list_vector.append('geonode:' + item['name'])
-
-        uploaded_raster = upload(gisdata.RASTER_DATA)
-        upload_list_raster = []
-        for item in uploaded_raster:
-            upload_list_raster.append('geonode:' + item['name'])
+        url_shape_zip = '%swfs?%s%s%s&outputFormat=%s&version=1.0.0&request=GetFeature&service=WFS' % (settings.GEOSERVER_BASE_URL,'format_options=charset%3AUTF-8&','typename=geonode%3A','san_andres_y_providencia_water','SHAPE-ZIP')
         
-        #test a valid user with layer replace permission         
-        from django.test.client import Client
-        c = Client()
-        c.login(username='admin', password='admin')
-
-        #test the program can determine the original layer in raster type 
-        url = '%sdata/%s/replace' % (settings.SITEURL, upload_list_raster.pop())
-        #print url
-        response = c.get(url)
-        self.assertEquals(response.status_code, 200)   
-        self.assertEquals(response.context['is_featuretype'], False)
+        url_GML2 = '%swfs?%s%s&outputFormat=%s&version=1.0.0&request=GetFeature&service=WFS' % (settings.GEOSERVER_BASE_URL,'typename=geonode%3A','san_andres_y_providencia_water','gml2')
         
-        #test the program can determine the original layer in vector type
-        url = '%sdata/%s/replace' % (settings.SITEURL, upload_list_vector.pop())
-        #print url
-        response = c.get(url)
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(response.context['is_featuretype'], True)
-   
-        
-        
-        ##################################work on it#######################################
-        """
-        #test replace a valid layer
-        #response = c.post(url, {'layer': upload_list_vector.pop()})
-        #self.assertEquals(response.status_code, 200)
-
-        #test replace an invalid layer 
-        #response = c.post(url, {'layer': upload_list_raster.pop()})
-        #self.assertEquals(response.status_code, 403)
-
-        #test the replaced layer is indeed different from the original layer
-        #I can test bbox, but may not be adequate, WFS testing 
-        vec_new = vec
-        #vec_origin =         
-        #response = c.get(url)
-        #self.assertEquals(response.status_code, 200)
-        
-        """ 
-
-        #test an invalid user without layer replace permission
-        c.logout()   
-        c.login(username='norman', password='norman')
-          
-        url = '%sdata/%s/replace' % (settings.SITEURL, upload_list_vector.pop())
-        response = c.post(url)
-        self.assertEquals(response.status_code, 403)
-         
-    def test_field(self):
-        
-        download_url_zip = 'http://localhost:8001/geoserver/wfs?format_options=charset%3AUTF-8&typename=geonode%3Asan_andres_y_providencia_water&outputFormat=SHAPE-ZIP&version=1.0.0&service=WFS&request=GetFeature'
-        
-        download_url_GML2 = '%s%s%s%s&outputFormat=%s&version=1.0.0&request=GetFeature&service=WFS' % (settings.GEOSERVER_BASE_URL,'wfs?','typename=geonode%3A','san_andres_y_providencia_water','gml2')
-
-        download_url_GML = 'http://localhost:8001/geoserver/wfs?typename=geonode%3Asan_andres_y_providencia_water&outputFormat=gml2&version=1.0.0&request=GetFeature&service=WFS'
-        
-        print download_url_GML
+        print url_shape_zip
+        print url_GML2
         return
     
         response, content = http_client.request(download_url_GML,'GET')
