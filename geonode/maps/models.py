@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import errno
 
 from django.conf import settings
 from django.db import models
@@ -249,7 +250,7 @@ class MapLayer(models.Model, GXPLayerBase):
     # If this dictionary conflicts with options that are stored in other fields
     # (such as ows_url) then the fields override.
 
-    local = models.BooleanField()
+    local = models.BooleanField(default=False)
     # True if this layer is served by the local geoserver
 
     @property
@@ -267,10 +268,22 @@ class MapLayer(models.Model, GXPLayerBase):
     def __unicode__(self):
         return '%s?layers=%s' % (self.ows_url, self.name)
 
-def pre_save_maplayer(instance, sender, **kw):
+def pre_save_maplayer(instance, sender, **kwargs):
+    # If this object was saved via fixtures,
+    # do not do post processing.
+    if kwargs.get('raw', False):
+        return
+
     _user, _password = settings.GEOSERVER_CREDENTIALS
     url = "%srest" % settings.GEOSERVER_BASE_URL
-    c = Catalog(url, _user, _password)   
-    instance.local = isinstance(c.get_layer(instance.name),GsLayer)
+    try:
+        c = Catalog(url, _user, _password)   
+        instance.local = isinstance(c.get_layer(instance.name),GsLayer)
+    except EnvironmentError, e:
+        if e.errno == errno.ECONNREFUSED:
+            msg = 'Could not connect to catalog to verify if layer %s was local' % instance.name
+            logger.warn(msg, e)
+        else:
+            raise e
 
 signals.pre_save.connect(pre_save_maplayer, sender=MapLayer)

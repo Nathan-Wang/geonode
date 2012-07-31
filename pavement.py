@@ -155,13 +155,7 @@ def setup_client(options):
     for t, o in resources:
         origin = os.path.join('geonode-client', o)
         target = os.path.join(static, t)
-        if os.path.isdir(origin):
-            shutil.rmtree(target, ignore_errors=True)
-            shutil.copytree(origin, target)
-        elif os.path.isfile(origin):
-            if not os.path.exists(target):
-                os.makedirs(target)
-            shutil.copyfile(origin, target)
+        justcopy(origin, target)
 
 @task
 @needs([
@@ -549,7 +543,7 @@ def kill(arg1, arg2):
                         % (arg1, '\n'.join([l.strip() for l in lines])))
 
 
-def waitfor(url, timeout=180):
+def waitfor(url, timeout=300):
     started = False
     for a in xrange(timeout):
         try:
@@ -562,3 +556,13 @@ def waitfor(url, timeout=180):
                 break 
         time.sleep(1)
     return started
+
+
+def justcopy(origin, target):
+    if os.path.isdir(origin):
+         shutil.rmtree(target, ignore_errors=True)
+         shutil.copytree(origin, target)
+    elif os.path.isfile(origin):
+        if not os.path.exists(target):
+            os.makedirs(target)
+        shutil.copy(origin, target)
