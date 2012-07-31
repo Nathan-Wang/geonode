@@ -11,6 +11,7 @@ import time
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.management import call_command
+from django.test.client import Client
 
 from geoserver.catalog import FailedRequestError
 
@@ -24,15 +25,13 @@ from geonode.layers.utils import (
     save
 )
 from geonode.utils import http_client
-from .utils import check_layer, get_web_page
+from .utils import check_layer, get_web_page, download_and_unzip
 
 from geonode.maps.utils import *
 from geonode.catalogue import get_catalogue
 
 from geonode.gs_helpers import cascading_delete, fixup_style
 import gisdata
-
-import zipfile
 
 class _Client(object):
 
@@ -587,6 +586,9 @@ class GeoNodeMapTest(TestCase):
             #file = item['file']
             #print(file.split('/')[-1])
         
+        c = Client()
+        c.login(username='admin', password='admin')
+
         response = c.post('/data/download', {'layer': upload_list})
         if response.status_code == 200:
             # go for it
@@ -605,14 +607,14 @@ class GeoNodeMapTest(TestCase):
             download_url = "%srest/process/batchDownload/download/%s" % (settings.GEOSERVER_BASE_URL, id)
             print download_url
             
-            # Download the file  #Need work on automatic authentication
+            # Download the file
             # Right now it is downloaded to a folder hard coded below, needs change in future           
             # Unzip it            
-            self.getunzipped(download_url,'/home/nathanwang/Downloads/Temp')
+            location = download_and_unzip(download_url, "admin", "admin")
             
             # Check that the readme is included
             try:
-                with open('/home/nathanwang/Downloads/Temp/README.txt') as f: pass
+                with open('%s/README.txt' % location) as f: pass
             except IOError as e:
                 print 'README.txt does NOT exist!'
 
@@ -620,56 +622,16 @@ class GeoNodeMapTest(TestCase):
             for item in uploaded:
                 file = (item['file'].split('/')[-1])
                 try:
-                    with open('/home/nathanwang/Downloads/Temp/' + file) as f: pass
+                    with open('%s/%s' % (location, file)) as f: pass
                 except IOError as e:
                     print file + ' does NOT exist!'    #tiff files have error because of their inconsistent naming rules
             
             # Check through each file to see that they are valid
-            #import shapefile            
 
         else:
             # TODO deal with some error
             pass
 
-    #This function download zip file from remote site and unzip it
-    def getunzipped(self, theurl, thedir):
-        name = os.path.join(thedir, 'temp.zip')
-        try:
-            name, hdrs = urllib.urlretrieve(theurl, name)
-        except IOError, e:
-            print "Can't retrieve %r to %r: %s" % (theurl, thedir, e)
-            return
-        try:
-            z = zipfile.ZipFile(name)
-        except zipfile.error, e:
-            print "Bad zipfile (from %r): %s" % (theurl, e)
-            return
-        for n in z.namelist():
-            dest = os.path.join(thedir, n)
-            destdir = os.path.dirname(dest)
-            if not os.path.isdir(destdir):
-                os.makedirs(destdir)
-            data = z.read(n)
-            f = open(dest, 'w')
-            f.write(data)
-            f.close()
-        z.close()
-        os.unlink(name)
-         
-    def test_wfs_download(self):
-        
-        url_shape_zip = '%swfs?%s%s%s&outputFormat=%s&version=1.0.0&request=GetFeature&service=WFS' % (settings.GEOSERVER_BASE_URL,'format_options=charset%3AUTF-8&','typename=geonode%3A','san_andres_y_providencia_water','SHAPE-ZIP')
-        
-        url_GML2 = '%swfs?%s%s&outputFormat=%s&version=1.0.0&request=GetFeature&service=WFS' % (settings.GEOSERVER_BASE_URL,'typename=geonode%3A','san_andres_y_providencia_water','gml2')
-        
-        print url_shape_zip
-        print url_GML2
-        return
-    
-        response, content = http_client.request(download_url_GML,'GET')
-        print content
-        #self.getunzipped(download_url,'/home/nathanwang/Downloads/Temp')
-        
 
     def test_layer_replace(self):
         """Test layer replace functionality
@@ -687,7 +649,6 @@ class GeoNodeMapTest(TestCase):
             upload_list_raster.append('geonode:' + item['name'])
         
         #test a valid user with layer replace permission         
-        from django.test.client import Client
         c = Client()
         c.login(username='admin', password='admin')
 
