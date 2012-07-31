@@ -587,10 +587,6 @@ class GeoNodeMapTest(TestCase):
             #file = item['file']
             #print(file.split('/')[-1])
         
-        from django.test.client import Client
-        c = Client()
-        c.login(username='admin', password='admin')
-
         response = c.post('/data/download', {'layer': upload_list})
         if response.status_code == 200:
             # go for it
@@ -674,3 +670,84 @@ class GeoNodeMapTest(TestCase):
         print content
         #self.getunzipped(download_url,'/home/nathanwang/Downloads/Temp')
         
+
+    def test_layer_replace(self):
+        """Test layer replace functionality
+        """
+        # Upload Some Data to work with
+               
+        uploaded_vector = upload(gisdata.VECTOR_DATA)
+        upload_list_vector = []
+        for item in uploaded_vector:
+            upload_list_vector.append('geonode:' + item['name'])
+
+        uploaded_raster = upload(gisdata.RASTER_DATA)
+        upload_list_raster = []
+        for item in uploaded_raster:
+            upload_list_raster.append('geonode:' + item['name'])
+        
+        #test a valid user with layer replace permission         
+        from django.test.client import Client
+        c = Client()
+        c.login(username='admin', password='admin')
+
+        #test the program can determine the original layer in raster type 
+        raster_layer = upload_list_raster.pop()
+        raster_url = '%sdata/%s/replace' % (settings.SITEURL, raster_layer)
+        response = c.get(raster_url)
+        self.assertEquals(response.status_code, 200)   
+        self.assertEquals(response.context['is_featuretype'], False)
+        
+        #test the program can determine the original layer in vector type
+        original_vector_layer_name = upload_list_vector.pop()
+        original_vector_layer = Layer.objects.get(typename = original_vector_layer_name)
+        vector_url = '%sdata/%s/replace' % (settings.SITEURL, original_vector_layer_name)
+        response = c.get(vector_url)
+        self.assertEquals(response.status_code, 200)
+        self.assertEquals(response.context['is_featuretype'], True)
+   
+        #test replace a vector with a raster 
+        layer_typename = raster_layer 
+        layer_path = str('%s/%s' % (gisdata.RASTER_DATA, layer_typename.replace('geonode:', '')))
+        layer_base = open(layer_path + '.tif')
+        response = c.post(vector_url, {'base_file': layer_base})
+        # TODO: This should really return a 400 series error with the json dict
+        self.assertEquals(response.status_code, 200)
+        response_dict = json.loads(response.content)
+        self.assertEquals(response_dict['success'], False)
+
+        #test replace a vector with a different vector
+        new_vector_layer_name = upload_list_vector.pop()
+        new_vector_layer = Layer.objects.get(typename = new_vector_layer_name)
+        layer_path = str('%s/%s' % (gisdata.VECTOR_DATA, new_vector_layer_name.replace('geonode:', '')))
+        layer_base = open(layer_path + '.shp')
+        layer_dbf = open(layer_path + '.dbf')
+        layer_shx = open(layer_path + '.shx')
+        try:
+            layer_prj = open(layer_path + '.prj')
+        except:
+            layer_prj = None
+
+        response = c.post(vector_url, {'base_file': layer_base,
+                                'dbf_file': layer_dbf,
+                                'shx_file': layer_shx,
+                                'prj_file': layer_prj
+                                })
+        self.assertEquals(response.status_code, 200)
+        response_dict = json.loads(response.content) 
+        self.assertEquals(response_dict['success'], True)
+
+        #Test the replaced layer is indeed different from the original layer
+        self.assertNotEqual(original_vector_layer.typename, new_vector_layer.typename)
+        self.assertNotEqual(original_vector_layer.bbox_string, new_vector_layer.bbox_string)
+
+        #test an invalid user without layer replace permission
+        c.logout()   
+        c.login(username='norman', password='norman')
+          
+        response = c.post(vector_url, {'base_file': layer_base,
+                                'dbf_file': layer_dbf,
+                                'shx_file': layer_shx,
+                                'prj_file': layer_prj
+                                })
+        self.assertEquals(response.status_code, 403)
