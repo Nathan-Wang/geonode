@@ -52,6 +52,8 @@ from geonode.maps.utils import *
 from geonode.gs_helpers import cascading_delete, fixup_style
 import gisdata
 
+import Image
+import shapefile
 import zipfile
 
 LOGIN_URL= "/accounts/login/"
@@ -215,7 +217,7 @@ class GeoNodeMapTest(TestCase):
         sampletxt = os.path.join(gisdata.VECTOR_DATA,
             'points_epsg2249_no_prj.dbf')
         try:
-            file_upload(sampletxt)
+            file_upload(sampletxt, overwrite=True)
         except GeoNodeException, e:
             pass
         except Exception, e:
@@ -419,7 +421,7 @@ class GeoNodeMapTest(TestCase):
 
         # Test Uploading then Deleting a TIFF file from GeoServer
         tif_file = os.path.join(gisdata.RASTER_DATA, 'test_grid.tif')
-        tif_layer = file_upload(tif_file)
+        tif_layer = file_upload(tif_file, overwrite=True)
         tif_store = gs_cat.get_store(tif_layer.name)
         tif_layer.delete_from_geoserver()
         self.assertRaises(FailedRequestError,
@@ -435,7 +437,7 @@ class GeoNodeMapTest(TestCase):
 
         # Upload a Shapefile Layer
         shp_file = os.path.join(gisdata.VECTOR_DATA, 'san_andres_y_providencia_poi.shp')
-        shp_layer = file_upload(shp_file)
+        shp_layer = file_upload(shp_file, overwrite=True)
         shp_layer_id = shp_layer.pk
         shp_store = gs_cat.get_store(shp_layer.name)
         shp_store_name = shp_store.name
@@ -476,7 +478,7 @@ class GeoNodeMapTest(TestCase):
 
         # Upload a Shapefile
         shp_file = os.path.join(gisdata.VECTOR_DATA, 'san_andres_y_providencia_poi.shp')
-        shp_layer = file_upload(shp_file)
+        shp_layer = file_upload(shp_file, overwrite=True)
 
         # Save the names of the Resource/Store/Styles 
         resource_name = shp_layer.resource.name
@@ -575,7 +577,19 @@ class GeoNodeMapTest(TestCase):
                     print file + ' does NOT exist!'    #tiff files have error because of their inconsistent naming rules
             
             # Check through each file to see that they are valid
-
+            for item in uploaded:
+                file = (item['file'].split('/')[-1])
+                suffix = (item['file'].split('.')[-1])                
+                if suffix == 'tif':
+                    try:
+                        im = Image.open('%s/geonode:%sf' % (location, file))
+                    except IOError as e:
+                        print file + ' is an invalid tiff file!'                     
+                elif suffix == 'shp':
+                    try:
+                        sf = shapefile.Reader('%s/%s' % (location, file))
+                    except IOError as e:
+                        print file + ' is an invalid shapefile!' 
         else:
             # TODO deal with some error
             pass
